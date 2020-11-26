@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-owner-watcher
+subjects:
+- kind: ServiceAccount
+  name: pod-owner-watcher
+  namespace: devops
+roleRef:
+  kind: ClusterRole
+  name: pod-watcher
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,17 @@
+replicaCount: 1
+image:
+  repository: "artemirk/podownerwatch"
+  tag: "latest"
+  pullPolicy: IfNotPresent
+  pullSecrets: ""
+
+ingress:
+  enabled: false
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

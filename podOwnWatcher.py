@@ -84,13 +84,10 @@ def getGrantOwner(name, namespace, otype):
 if __name__ == "__main__":  # noqa
     create_tables()
     try:
+        config.load_kube_config()
+    except BaseException:
+        # load_kube_config throws if there is no config, but does not document what it throws, so I can't rely on any particular type here
         config.load_incluster_config()
-    except config.ConfigException:
-        try:
-            config.load_kube_config()
-        except config.ConfigException:
-            raise Exception("Could not configure kubernetes python client")
-
     core_api = client.CoreV1Api()
     apis_api = client.AppsV1Api()
     batch_api = client.BatchV1Api()
@@ -116,8 +113,8 @@ if __name__ == "__main__":  # noqa
                     if owner == "" and event['object'].metadata.name.startswith("kube-proxy"):
                         owner = "System:kube-proxy"
                     put_pod(event['object'].metadata.name, owner, namespace)
-                    if owner == "" and namespace != "kube-system":
-                        logging.warning("No owner: %s" % (event))
+                    # if owner == "" and namespace != "kube-system":
+                    #    logging.warning("No owner: %s" % (event))
                 logging.info("Event: %s %s" % (event['type'], event['object'].metadata.name))
         except (ReadTimeoutError, IOError):
             time.sleep(5)
