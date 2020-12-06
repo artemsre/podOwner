@@ -9,7 +9,6 @@ metadata:
     heritage: {{ .Release.Service }}
     app.kubernetes.io/name: {{ template "name" . }}
 spec:
-  serviceAccountName: "pod-owner-watcher"
   replicas: {{ .Values.replicaCount }}
   template:
     metadata:
@@ -18,6 +17,7 @@ spec:
         release: {{ .Release.Name }}
         app.kubernetes.io/name: {{ template "name" . }}
     spec:
+      serviceAccountName: pod-owner-watcher
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
         - name: {{ .Values.image.pullSecrets }}
