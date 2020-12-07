@@ -155,7 +155,7 @@ class MainHandler(tornado.web.RequestHandler):
         try:
             r = requests.get(
                 promURL +
-                '/api/v1/query?query=sum%20by%20(pod_name,namespace)%20(container_cpu_usage_seconds_total{})',
+                '/api/v1/query?query=sum%20by%20(pod_name,namespace)%20(container_cpu_usage_seconds_total{cpu="total"})',
                 timeout=5)
             jout = r.json()
             if "status" in jout:
