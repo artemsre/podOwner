@@ -22,6 +22,7 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS pod_owner (
             pod_name varchar(64) PRIMARY KEY,
             namespace varchar(64),
+            release varchar(64),
             pod_owner VARCHAR(140) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -45,14 +46,14 @@ def create_tables():
             conn.close()
 
 
-def put_pod(pod, owner, namespace):
+def put_pod(pod, owner, namespace, release):
     psqlURL = os.getenv("PSQL_URL")
     conn = None
     try:
         conn = psycopg2.connect(psqlURL)
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO pod_owner (pod_name,pod_owner,namespace) values(%s,%s, %s);", (pod, owner, namespace))
+            "INSERT INTO pod_owner (pod_name,pod_owner,namespace,release) values(%s, %s, %s, %s);", (pod, owner, namespace, release))
         cur.close()
         conn.commit()
     except (Exception, psycopg2.DatabaseError) as error:
@@ -113,7 +114,10 @@ def watch_grab_owner():
                     if owner == "" and event['object'].metadata.name.startswith("kube-proxy"):
                         owner = "System:kube-proxy"
                     if event['object'].metadata.name not in podOwners:
-                        put_pod(event['object'].metadata.name, owner, namespace)
+                        release=""
+                        if "release" in event['object'].metadata.labels:
+                            release= event['object'].metadata.labels['release']
+                        put_pod(event['object'].metadata.name, owner, namespace,release)
                         podOwners[event['object'].metadata.name] = owner
                     # if owner == "" and namespace != "kube-system":
                     #    logging.warning("No owner: %s" % (event))
@@ -147,26 +151,45 @@ class MainHandler(tornado.web.RequestHandler):
     def get(self):
         global podOwners
         promURL = os.getenv("PROMETHEUS_URL")
+        nl = '\n'
         responce = """
 # HELP cost_cpu_seconds_total Total number of second used by pods.
 # TYPE cost_cpu_seconds_total counter
         """
-        nl = '\n'
         try:
             r = requests.get(
                 promURL +
-                '/api/v1/query?query=sum%20by%20(pod_name,namespace)%20(container_cpu_usage_seconds_total{cpu="total"})',
+                '/api/v1/query?query=sum%20by%20(pod,namespace)%20(container_cpu_usage_seconds_total{cpu="total"})',
                 timeout=5)
             jout = r.json()
             if "status" in jout:
                 if jout["status"] == "success":
                     for line in jout["data"]["result"]:
-                        if "pod_name" not in line["metric"]:
+                        if "pod" not in line["metric"]:
                             continue
-                        p = line["metric"]["pod_name"]
+                        p = line["metric"]["pod"]
                         n = line["metric"]["namespace"]
                         if p in podOwners:
-                            responce += rf"""cost_cpu_seconds_total{{pod_name="{p}",namespace="{n}" , pod_owner="{podOwners[p]}"}} {line["value"][1]} {nl}"""
+                            responce += rf"""cost_cpu_seconds_total{{pod="{p}",namespace="{n}" , pod_owner="{podOwners[p]}"}} {line["value"][1]} {nl}"""
+            responce += """
+# HELP cost_memory_usage_bytes Total number of second used by pods.
+# TYPE cost_memory_usage_bytes gauge
+                   """ + nl
+            r = requests.get(
+                promURL +
+                '/api/v1/query?query=sum%20by%20(pod%2Cnamespace)%20(container_memory_usage_bytes%7Bcontainer%3D""%2Cpod%3D~".%2B"%7D)',
+                timeout=5)
+            jout = r.json()
+            if "status" in jout:
+                if jout["status"] == "success":
+                    for line in jout["data"]["result"]:
+                        if "pod" not in line["metric"]:
+                            continue
+                        p = line["metric"]["pod"]
+                        n = line["metric"]["namespace"]
+                        if p in podOwners:
+                            responce += rf"""cost_memory_usage_bytes{{pod="{p}",namespace="{n}" , pod_owner="{podOwners[p]}"}} {line["value"][1]} {nl}"""
+
         except Exception as e:
             logging.warning(f"Prometheus access error {e}")
         self.write(responce)
