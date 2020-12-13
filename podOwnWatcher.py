@@ -89,6 +89,7 @@ def getGrantOwner(name, namespace, otype):
 
 def watch_grab_owner():
     global podOwners
+    global podRelease
     global apis_api
     global batch_api
     global core_api
@@ -116,9 +117,10 @@ def watch_grab_owner():
                     if event['object'].metadata.name not in podOwners:
                         release=""
                         if "release" in event['object'].metadata.labels:
-                            release= event['object'].metadata.labels['release']
+                            release=event['object'].metadata.labels['release']
                         put_pod(event['object'].metadata.name, owner, namespace,release)
                         podOwners[event['object'].metadata.name] = owner
+                        podRelease[event['object'].metadata.name] = release
                     # if owner == "" and namespace != "kube-system":
                     #    logging.warning("No owner: %s" % (event))
                 logging.info("Event: %s %s" % (event['type'], event['object'].metadata.name))
@@ -133,10 +135,11 @@ def getPodFromDB():
     try:
         conn = psycopg2.connect(psqlURL)
         cur = conn.cursor()
-        cur.execute("select pod_name,pod_owner from pod_owner;")
+        cur.execute("select pod_name,pod_owner,release from pod_owner;")
         allrows = cur.fetchall()
         for row in allrows:
             podOwners[row[0]] = row[1]
+            podRelease[row[0]] = row[2]
         cur.close()
         conn.commit()
     except (Exception, psycopg2.DatabaseError) as error:
@@ -150,6 +153,7 @@ def getPodFromDB():
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         global podOwners
+        global podRelease
         promURL = os.getenv("PROMETHEUS_URL")
         nl = '\n'
         responce = """
@@ -170,7 +174,7 @@ class MainHandler(tornado.web.RequestHandler):
                         p = line["metric"]["pod"]
                         n = line["metric"]["namespace"]
                         if p in podOwners:
-                            responce += rf"""cost_cpu_seconds_total{{pod="{p}",namespace="{n}" , pod_owner="{podOwners[p]}"}} {line["value"][1]} {nl}"""
+                            responce += rf"""cost_cpu_seconds_total{{pod="{p}",namespace="{n}" , pod_owner="{podOwners[p]}", pod_release="{podRelease[p]}" }} {line["value"][1]} {nl}"""
             responce += """
 # HELP cost_memory_usage_bytes Total number of second used by pods.
 # TYPE cost_memory_usage_bytes gauge
@@ -188,7 +192,7 @@ class MainHandler(tornado.web.RequestHandler):
                         p = line["metric"]["pod"]
                         n = line["metric"]["namespace"]
                         if p in podOwners:
-                            responce += rf"""cost_memory_usage_bytes{{pod="{p}",namespace="{n}" , pod_owner="{podOwners[p]}"}} {line["value"][1]} {nl}"""
+                            responce += rf"""cost_memory_usage_bytes{{pod="{p}",namespace="{n}" , pod_owner="{podOwners[p]}", pod_release="{podRelease[p]}" }} {line["value"][1]} {nl}"""
 
         except Exception as e:
             logging.warning(f"Prometheus access error {e}")
@@ -213,6 +217,7 @@ if __name__ == "__main__":  # noqa
     apis_api = client.AppsV1Api()
     batch_api = client.BatchV1Api()
     podOwners = dict()
+    podRelease = dict()
     lastPodAccess = dict()
     getPodFromDB()
     t1 = threading.Thread(target=watch_grab_owner)
