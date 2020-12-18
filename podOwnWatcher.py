@@ -215,7 +215,7 @@ def updateMetrics():
         try:
             r = requests.get(
                 promURL +
-                '/api/v1/query?query=sum%20by%20(pod%2Cnamespace)%20(max_over_time(container_memory_usage_bytes%5B1h%5D))',
+                '/api/v1/query?query=sum%20by%20(pod)%20(max_over_time(container_memory_working_set_bytes%7Bcontainer%3D""%7D%5B1h%5D))%2F1024%2F1024'
                 timeout=5)
             jout = r.json()
             if "status" in jout:
@@ -229,7 +229,7 @@ def updateMetrics():
                             value = int(float(line["value"][1]))    
                         except ValueError:
                             continue
-                        put_metric(p,"container_memory_usage_bytes_hour",value)
+                        put_metric(p,"pod_memory_megabytes_hour",value)
                         if p in mem_bytes:
                                 mem_bytes[p] += value
                         else:
@@ -320,7 +320,7 @@ class MainHandler(tornado.web.RequestHandler):
               """ + nl
         for p in mem_bytes:
             if p in podOwners:
-                responce += rf"""cost_memory_usage_bytes_total{{pod="{p}", pod_owner="{podOwners[p]}", pod_release="{podRelease[p]}" }} {mem_bytes[p]} {nl}"""
+                responce += rf"""cost_memory_usage_pod_megabytes_total{{pod="{p}", pod_owner="{podOwners[p]}", pod_release="{podRelease[p]}" }} {mem_bytes[p]} {nl}"""
         self.write(responce)
 
 def getPvcInfo(name,namespace):
