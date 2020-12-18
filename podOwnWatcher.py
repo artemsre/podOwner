@@ -215,7 +215,7 @@ def updateMetrics():
         try:
             r = requests.get(
                 promURL +
-                '/api/v1/query?query=sum%20by%20(pod)%20(max_over_time(container_memory_working_set_bytes%7Bcontainer%3D""%7D%5B1h%5D))%2F1024%2F1024'
+                '/api/v1/query?query=sum%20by%20(pod)%20(max_over_time(container_memory_working_set_bytes%7Bcontainer%3D""%7D%5B1h%5D))%2F1024%2F1024',
                 timeout=5)
             jout = r.json()
             if "status" in jout:
