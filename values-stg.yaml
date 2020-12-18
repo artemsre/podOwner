@@ -1,0 +1,35 @@
+replicaCount: 1
+image:
+  repository: "artemirk/podownerwatch"
+  tag: "10"
+  pullPolicy: IfNotPresent
+  pullSecrets: ""
+environment:
+  - name: ADMIN_EMAIL_LIST
+    value: "artem.artemiev@inspectorio.com"
+  - name: PSQL_URL
+    value: "postgresql://costpieces_stg:dyV4thCW0fFR70wXPNTGQcwQtWjtmiAT@pg-staging.default.svc.cluster.local:5432/costpieces_stg"
+  - name: PROMETHEUS_URL
+    value: "http://prometheus-operator-prometheus.devops.svc.cluster.local:9090"
+
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 300Mi
+  requests:
+    cpu: 100m
+    memory: 100Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+monitoring:
+  enabled: true
+  prometheusOperatorName: "prometheus-operator"
